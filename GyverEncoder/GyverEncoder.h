@@ -31,9 +31,11 @@
 		- Добавлена поддержка TYPE1 для алгоритма PRECISE_ALGORITHM
 		- Добавлена отработка двойного клика: isSingle / isDouble
 		
-	- 4.3: Исправлено ложное isSingle
-		
+	- 4.3: Исправлено ложное isSingle		
 	- 4.4: Добавлен метод resetStates, сбрасывает все is-флаги и счётчики
+	- 4.5: Улучшен алгоритм BINARY_ALGORITHM (спасибо Ярославу Курусу)
+	- 4.6: BINARY_ALGORITHM пофикшен для TYPE1, добавлена isReleaseHold
+	- 4.7: Исправлен случайный нажатый поворот в BINARY_ALGORITHM
 */
 // ========= КОНСТАНТЫ ==========
 #define ENC_NO_BUTTON -1	// константа для работы без пина
@@ -60,11 +62,11 @@
 
 // алгоритмы опроса энкодера (раскомментировать нужный)
 //#define FAST_ALGORITHM		// тик 10 мкс, быстрый, не справляется с люфтами
-//#define BINARY_ALGORITHM	// тик 14 мкс, лучше справляется с люфтами
-#define PRECISE_ALGORITHM	// тик 16 мкс, медленнее, но работает даже с убитым энкодером (по мотивам https://github.com/mathertel/RotaryEncoder)
+#define BINARY_ALGORITHM	// тик 14 мкс, лучше справляется с люфтами
+//#define PRECISE_ALGORITHM	// тик 16 мкс, работает даже с убитым энкодером (по мотивам https://github.com/mathertel/RotaryEncoder)
 
 // настройка антидребезга энкодера, кнопки, таймаута удержания и таймаута двойного клика
-#define ENC_DEBOUNCE_TURN 1
+#define ENC_DEBOUNCE_TURN 0
 #define ENC_DEBOUNCE_BUTTON 80
 #define ENC_HOLD_TIMEOUT 700
 #define ENC_DOUBLE_TIMEOUT 300
@@ -78,6 +80,7 @@ typedef struct
 	bool isTurn_f: 1;
 	bool isPress_f: 1;
 	bool isRelease_f: 1;
+	bool isReleaseHold_f: 1;
 	bool isHolded_f: 1;
 	bool isFastR_f: 1;
 	bool isFastL_f: 1;
@@ -93,6 +96,7 @@ typedef struct
 	bool countFlag : 1;
 	bool doubleFlag : 1;
 	bool doubleAllow : 1;
+	bool rst_flag : 1;
 } GyverEncoderFlags;
 #pragma pack(pop)
 
@@ -127,13 +131,14 @@ public:
 	
 	boolean isPress();						// возвращает true при нажатии кнопки, сама сбрасывается в false
 	boolean isRelease();					// возвращает true при отпускании кнопки, сама сбрасывается в false
+	boolean isReleaseHold();				// возвращает true при отпускании кнопки после удержания, сама сбрасывается в false
 	boolean isClick();						// возвращает true при нажатии и отпускании кнопки, сама сбрасывается в false
 	boolean isHolded();						// возвращает true при удержании кнопки, сама сбрасывается в false
 	boolean isHold();						// возвращает true при удержании кнопки, НЕ СБРАСЫВАЕТСЯ
 	boolean isSingle();						// возвращает true при одиночном клике (после таймаута), сама сбрасывается в false
 	boolean isDouble();						// возвращает true при двойном клике, сама сбрасывается в false
 	
-	void resetStates();		// сбрасывает все is-флаги и счётчики
+	void resetStates();						// сбрасывает все is-флаги и счётчики
 	
 private:
 	GyverEncoderFlags flags;

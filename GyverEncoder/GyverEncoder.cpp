@@ -132,6 +132,13 @@ boolean Encoder::isRelease() {
 		return true;
 	} else return false;
 }
+boolean Encoder::isReleaseHold() {
+	if (flags.enc_tick_mode) Encoder::tick();
+	if (flags.isReleaseHold_f) {
+		flags.isReleaseHold_f = false;
+		return true;
+	} else return false;
+}
 boolean Encoder::isClick() {
 	if (flags.enc_tick_mode) Encoder::tick();
 	if (flags.isRelease_f) {
@@ -174,11 +181,10 @@ void Encoder::resetStates() {
 	flags.isFastL_f = false;
 	flags.isPress_f = false;
 	flags.isRelease_f = false;
-	flags.isRelease_f = false;
+	flags.isReleaseHold_f = false;
 	flags.isHolded_f = false;
 	flags.isSingle_f = false;
 	flags.isDouble_f = false;
-
 }
 
 // ================= TICK =================
@@ -212,8 +218,9 @@ void Encoder::tick() {
 		if (!SW_state && flags.butt_flag && (debounceDelta > ENC_DEBOUNCE_BUTTON)) {
 			if (!flags.turn_flag && !flags.hold_flag) {  // если кнопка отпущена и ручка не поворачивалась
 				flags.turn_flag = false;
-				flags.isRelease_f = true;
+				flags.isRelease_f = true;				
 			}
+			if (debounceDelta > ENC_HOLD_TIMEOUT) flags.isReleaseHold_f = true;
 			flags.butt_flag = false;
 			debounce_timer = thisMls;
 			debounceDelta = 0;
@@ -235,12 +242,11 @@ void Encoder::tick() {
 		}
 		if (flags.butt_flag && debounceDelta > ENC_HOLD_TIMEOUT && !flags.turn_flag) {
 			if (SW_state) {
-				flags.hold_flag = true;
-				flags.isRelease_f = false;
+				flags.hold_flag = true;				
 				flags.doubleAllow = false;
 			} else {
 				flags.butt_flag = false;
-				flags.hold_flag = false;
+				flags.hold_flag = false;				
 				debounce_timer = thisMls;
 				debounceDelta = 0;
 			}	
@@ -275,22 +281,29 @@ void Encoder::tick() {
 #endif
 		) {			
 			encState = 0;
-			if (curState == 0b11) {
-				switch (prevState) {
-				case 0b10: encState = 1; break;
-				case 0b01: encState = 2; break;
-				}			
-			} else if (curState == 0b00 && !flags.enc_type) {
-				switch (prevState) {
-				case 0b01: encState = 1; break;
-				case 0b10: encState = 2; break;
+			if (flags.rst_flag) {
+				if (curState == 0b11) {
+					flags.rst_flag = 0;
+					//encState = 3-prevState;
+					switch (prevState) {
+					case 0b10: encState = 1; break;		// 2 - 1
+					case 0b01: encState = 2; break;		// 1 - 2
+					}
+				} else if (!flags.enc_type && (curState == 0b00)) {
+					flags.rst_flag = 0;
+					//encState = prevState;
+					switch (prevState) {
+					case 0b01: encState = 1; break;
+					case 0b10: encState = 2; break;
+					}
 				}
 			}
+			if (curState == 0b00 || (!flags.enc_type && curState == 0b11)) flags.rst_flag = 1;
 
 #elif defined(PRECISE_ALGORITHM)			
 			uint8_t curState = (extTick) ? (flags.extCLK | (flags.extDT << 1)) : (digitalRead(_CLK) | (digitalRead(_DT) << 1));
 
-			if (prevState != curState
+			if (curState != prevState
 #if (ENC_DEBOUNCE_TURN > 0)
 			&& (debounceDelta > ENC_DEBOUNCE_TURN)
 #endif
